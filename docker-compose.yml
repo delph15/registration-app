@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Service MySQL
+  db:
+    image: mysql:8.0
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: user_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql # Exécute le script d'initialisation
+      - db_data:/var/lib/mysql # Stockage persistant des données
+    healthcheck: # Vérifie que la base de données est prête
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Service Backend Express.js
+  backend:
+    build: ./backend # Construit l'image depuis le Dockerfile dans le dossier backend
+    container_name: express_backend
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: db # Le nom du service MySQL dans Docker Compose
+      DB_USER: root
+      DB_PASSWORD: password
+      DB_NAME: user_db
+    depends_on:
+      db:
+        condition: service_healthy # Attend que la DB soit prête
+    restart: always
+
+  # Service Frontend React.js
+  frontend:
+    build: ./frontend # Construit l'image depuis le Dockerfile dans le dossier frontend
+    container_name: react_frontend
+    ports:
+      - "80:80" # Accès via http://localhost
+    depends_on:
+      - backend # Le frontend n'a pas besoin que le backend soit "healthy" pour démarrer Nginx
+    restart: always
+
+volumes:
+  db_data: # Volume pour la persistance des données MySQL
